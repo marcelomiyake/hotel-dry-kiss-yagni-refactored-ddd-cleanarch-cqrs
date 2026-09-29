@@ -105,7 +105,10 @@ After generating the frontend and Java coverage reports with the commands above,
 docker run --rm --network=host \
   -e SONAR_TOKEN -e SONAR_HOST_URL=https://sonarcloud.io \
   -v "$PWD":/usr/src \
-  -w /usr/src sonarsource/sonar-scanner-cli:latest
+  -v "$HOME/.m2/repository":/maven-repository:ro \
+  -w /usr/src sonarsource/sonar-scanner-cli:latest \
+  '-Dsonar.java.libraries=/maven-repository/**/*.jar' \
+  '-Dsonar.java.test.libraries=/maven-repository/**/*.jar'
 ```
 
 For Lighthouse, build and serve the production frontend with `npm run preview -- --host 0.0.0.0`, then audit `http://localhost:4173/` with the desktop preset. The checked build scored **100** for performance, accessibility, best practices, and SEO; its experimental agentic-browsing readiness checks scored **1.0**. SEO metadata includes the page title and description, Open Graph and Twitter fields, TravelAgency JSON-LD, `robots.txt`, `llms.txt`, and an AI Catalog manifest.
@@ -132,10 +135,10 @@ The LOC count excludes blank lines, generated output, dependencies, assets, docu
 
 | Token measure | Count |
 | --- | ---: |
-| Input tokens | 26,986,294 |
-| Cached input tokens | 26,324,096 |
-| Reasoning tokens (included in output) | 86,433 |
-| Output tokens | 144,957 |
-| Estimated model-token cost | **$0.40** |
+| Input tokens | 33,029,261 |
+| Cached input tokens | 32,269,696 |
+| Reasoning tokens (included in output) | 97,854 |
+| Output tokens | 162,166 |
+| Estimated model-token cost | **$0.48** |
 
 Estimate: `(input − cached input) × $0.10/M + cached input × $0.01/M + output × $0.50/M`, using the official [OpenAI ChatGPT rate card](https://help.openai.com/en/articles/20001415-chatgpt-rate-card-enterprise-token-based-pricing). This is a token-price estimate at the published rates, not an invoice; workspace billing terms may differ.
