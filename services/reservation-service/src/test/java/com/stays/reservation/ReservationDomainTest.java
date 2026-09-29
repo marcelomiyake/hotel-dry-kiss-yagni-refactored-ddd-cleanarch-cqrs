@@ -16,13 +16,15 @@ class ReservationDomainTest {
 
     @Test
     void rejectsInvalidStayAndBookingValues() {
+        LocalDate checkOut = CHECK_IN.plusDays(1);
+
         assertThatThrownBy(() -> reservation(CHECK_IN, CHECK_IN, 1, BigDecimal.TEN, ReservationStatus.PAYMENT_PENDING))
                 .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> reservation(CHECK_IN, CHECK_IN.plusDays(1), 0, BigDecimal.TEN, ReservationStatus.PAYMENT_PENDING))
+        assertThatThrownBy(() -> reservation(CHECK_IN, checkOut, 0, BigDecimal.TEN, ReservationStatus.PAYMENT_PENDING))
                 .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> reservation(CHECK_IN, CHECK_IN.plusDays(1), 1, BigDecimal.ZERO, ReservationStatus.PAYMENT_PENDING))
+        assertThatThrownBy(() -> reservation(CHECK_IN, checkOut, 1, BigDecimal.ZERO, ReservationStatus.PAYMENT_PENDING))
                 .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> reservation(CHECK_IN, CHECK_IN.plusDays(1), 1, BigDecimal.TEN, null))
+        assertThatThrownBy(() -> reservation(CHECK_IN, checkOut, 1, BigDecimal.TEN, null))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 

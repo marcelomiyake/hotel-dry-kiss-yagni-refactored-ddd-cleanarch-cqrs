@@ -19,11 +19,12 @@ class RatePeriodTest {
     @Test
     void rejectsMissingOrOutOfRangePeriods() {
         LocalDate start = LocalDate.parse("2026-06-10");
+        LocalDate overlongEnd = start.plusDays(366);
 
         assertThatThrownBy(() -> new RatePeriod(null, start)).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new RatePeriod(start, null)).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new RatePeriod(start, start)).isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> new RatePeriod(start, start.plusDays(366)))
+        assertThatThrownBy(() -> new RatePeriod(start, overlongEnd))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 }

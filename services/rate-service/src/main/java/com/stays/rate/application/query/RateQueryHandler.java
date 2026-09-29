@@ -37,7 +37,7 @@ public final class RateQueryHandler implements RateQueries {
     private RatePeriod ratePeriod(LocalDate checkIn, LocalDate checkOut) {
         try {
             return new RatePeriod(checkIn, checkOut);
-        } catch (IllegalArgumentException exception) {
+        } catch (IllegalArgumentException _) {
             throw new ApiException(
                     HttpStatus.BAD_REQUEST,
                     "invalid_dates",

@@ -13,17 +13,23 @@ class HotelDomainTest {
 
     @Test
     void rejectsRoomTypesWithoutCapacityOrInventory() {
-        assertThatThrownBy(() -> new RoomType(UUID.randomUUID(), HOTEL_ID, "Suite", "", 0, 2))
+        UUID roomTypeWithoutCapacity = UUID.randomUUID();
+        UUID roomTypeWithoutInventory = UUID.randomUUID();
+
+        assertThatThrownBy(() -> new RoomType(roomTypeWithoutCapacity, HOTEL_ID, "Suite", "", 0, 2))
                 .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> new RoomType(UUID.randomUUID(), HOTEL_ID, "Suite", "", 2, 0))
+        assertThatThrownBy(() -> new RoomType(roomTypeWithoutInventory, HOTEL_ID, "Suite", "", 2, 0))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
     void rejectsHotelsWithInvalidIdentityOrRating() {
+        BigDecimal ratingAboveMaximum = new BigDecimal("10.1");
+        BigDecimal negativeRating = new BigDecimal("-0.1");
+
         assertThatThrownBy(() -> hotel(" ", BigDecimal.TEN)).isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> hotel("Casa", new BigDecimal("10.1"))).isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> hotel("Casa", new BigDecimal("-0.1"))).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> hotel("Casa", ratingAboveMaximum)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> hotel("Casa", negativeRating)).isInstanceOf(IllegalArgumentException.class);
     }
 
     private Hotel hotel(String name, BigDecimal rating) {
