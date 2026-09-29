@@ -4,6 +4,9 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.util.List;
 
+import com.stays.reservation.application.port.CatalogPort;
+import com.stays.reservation.application.port.InventoryPort;
+import com.stays.reservation.application.port.RateQuotePort;
 import com.stays.common.ApiException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -11,11 +14,11 @@ import org.springframework.stereotype.Service;
 @Service
 public class SearchService {
     private static final Clock CLOCK = Clock.systemUTC();
-    private final CatalogClient catalog;
-    private final RateClient rates;
-    private final InventoryRepository inventory;
+    private final CatalogPort catalog;
+    private final RateQuotePort rates;
+    private final InventoryPort inventory;
 
-    public SearchService(CatalogClient catalog, RateClient rates, InventoryRepository inventory) {
+    public SearchService(CatalogPort catalog, RateQuotePort rates, InventoryPort inventory) {
         this.catalog = catalog;
         this.rates = rates;
         this.inventory = inventory;

@@ -6,6 +6,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.util.UUID;
 
 import com.stays.common.ApiException;
+import com.stays.hotel.application.command.HotelCommands;
+import com.stays.hotel.application.query.HotelQueries;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -32,46 +34,49 @@ class HotelRepositoryIntegrationTest {
     }
 
     @Autowired
-    private HotelRepository hotels;
+    private HotelQueries queries;
+
+    @Autowired
+    private HotelCommands commands;
 
     @Test
     void searchesSeededHotelsAndTheirActiveRoomTypes() {
-        assertThat(hotels.findHotels(null)).hasSize(2);
-        assertThat(hotels.findHotels("lisBON")).allSatisfy(hotel -> assertThat(hotel.roomTypes()).isNotEmpty());
-        assertThat(hotels.findHotels("nowhere")).isEmpty();
-        assertThat(hotels.findHotel(java.util.UUID.fromString("11111111-1111-1111-1111-111111111111"))
+        assertThat(queries.findHotels(null)).hasSize(2);
+        assertThat(queries.findHotels("lisBON")).allSatisfy(hotel -> assertThat(hotel.roomTypes()).isNotEmpty());
+        assertThat(queries.findHotels("nowhere")).isEmpty();
+        assertThat(queries.findHotel(java.util.UUID.fromString("11111111-1111-1111-1111-111111111111"))
                 .roomTypes()).hasSize(2);
     }
 
     @Test
     void managesHotelsAndRoomTypesAndReturnsNotFoundForInactiveRecords() {
-        Hotel created = hotels.createHotel(hotelDraft("Casa Test"));
+        Hotel created = commands.createHotel(hotelDraft("Casa Test"));
         UUID hotelId = created.id();
         assertThat(created.city()).isEqualTo("Lisbon");
 
-        Hotel updated = hotels.updateHotel(hotelId, hotelDraft("Casa Updated"));
+        Hotel updated = commands.updateHotel(hotelId, hotelDraft("Casa Updated"));
         assertThat(updated.name()).isEqualTo("Casa Updated");
 
-        RoomType room = hotels.createRoomType(hotelId, new RoomTypeDraft("Suite", "Two beds", 4, 3));
+        RoomType room = commands.createRoomType(hotelId, new RoomTypeDraft("Suite", "Two beds", 4, 3));
         UUID roomId = room.id();
         assertThat(room.totalInventory()).isEqualTo(3);
-        assertThat(hotels.findHotel(hotelId).roomTypes()).contains(room);
+        assertThat(queries.findHotel(hotelId).roomTypes()).contains(room);
 
-        RoomType updatedRoom = hotels.updateRoomType(roomId, new RoomTypeDraft("Family suite", "Two beds", 4, 4));
+        RoomType updatedRoom = commands.updateRoomType(roomId, new RoomTypeDraft("Family suite", "Two beds", 4, 4));
         assertThat(updatedRoom.name()).isEqualTo("Family suite");
-        hotels.removeRoomType(roomId);
-        assertThat(hotels.findHotel(hotelId).roomTypes()).isEmpty();
+        commands.removeRoomType(roomId);
+        assertThat(queries.findHotel(hotelId).roomTypes()).isEmpty();
         RoomTypeDraft hiddenDraft = new RoomTypeDraft("Hidden", "Details", 2, 1);
-        assertThatThrownBy(() -> hotels.updateRoomType(roomId, hiddenDraft))
+        assertThatThrownBy(() -> commands.updateRoomType(roomId, hiddenDraft))
                 .isInstanceOf(ApiException.class);
 
-        hotels.removeHotel(hotelId);
-        assertThat(hotels.findHotels("Casa Updated")).isEmpty();
-        assertThatThrownBy(() -> hotels.findHotel(hotelId)).isInstanceOf(ApiException.class);
+        commands.removeHotel(hotelId);
+        assertThat(queries.findHotels("Casa Updated")).isEmpty();
+        assertThatThrownBy(() -> queries.findHotel(hotelId)).isInstanceOf(ApiException.class);
         RoomTypeDraft replacementDraft = new RoomTypeDraft("Suite", "Details", 2, 1);
-        assertThatThrownBy(() -> hotels.createRoomType(hotelId, replacementDraft))
+        assertThatThrownBy(() -> commands.createRoomType(hotelId, replacementDraft))
                 .isInstanceOf(ApiException.class);
-        assertThatThrownBy(() -> hotels.removeRoomType(roomId)).isInstanceOf(ApiException.class);
+        assertThatThrownBy(() -> commands.removeRoomType(roomId)).isInstanceOf(ApiException.class);
     }
 
     private HotelDraft hotelDraft(String name) {

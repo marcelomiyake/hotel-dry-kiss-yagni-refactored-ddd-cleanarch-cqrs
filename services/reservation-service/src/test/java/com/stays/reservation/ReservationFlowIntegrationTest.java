@@ -22,6 +22,10 @@ import java.util.UUID;
 
 import tools.jackson.databind.ObjectMapper;
 import com.stays.common.ApiException;
+import com.stays.reservation.application.port.CatalogPort;
+import com.stays.reservation.application.port.InventoryPort;
+import com.stays.reservation.application.port.PaymentPort;
+import com.stays.reservation.application.port.RateQuotePort;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -69,19 +73,19 @@ class ReservationFlowIntegrationTest {
     private ObjectMapper json;
 
     @Autowired
-    private InventoryRepository inventory;
+    private InventoryPort inventory;
 
     @Autowired
     private JdbcTemplate jdbc;
 
     @MockitoBean
-    private CatalogClient catalog;
+    private CatalogPort catalog;
 
     @MockitoBean
-    private RateClient rates;
+    private RateQuotePort rates;
 
     @MockitoBean
-    private PaymentClient payments;
+    private PaymentPort payments;
 
     @BeforeEach
     void resetClients() {

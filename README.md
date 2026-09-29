@@ -1,36 +1,46 @@
-# Stays · Hotel Reservation System
+# Stays · Lisbon Hotel Reservations
 
-A hotel room reservation demo based on the [ByteByteGo Hotel Reservation System](https://bytebytego.com/courses/system-design-interview/hotel-reservation-system), with the visual flow handed off from OpenDesign.
-
-## Screenshot
-
-This is the production React frontend served from a local preview. The API-backed flows and Lighthouse audit remain unverified because `localhost:8080` already had an existing listener, which I left untouched.
+A Java and React hotel reservation demo forked from [hotel-dry-kiss-yagni](https://github.com/marcelomiyake/hotel-dry-kiss-yagni). The backend and frontend are organized around domain rules, application use cases, ports, and adapters, while the existing visual system and HTTP API contracts are retained.
 
 ![Stays hotel reservation search page](docs/screenshots/hotel-reservation-home.png)
 
-## What it does
+## Product behavior
 
-- Search Lisbon hotels by destination, dates, and guest count; compare live room availability and daily rates.
-- Reserve by room type. PostgreSQL stores inventory per date, permits up to 10% overbooking, and uses version-checked updates to protect concurrent bookings.
-- Reuse a reservation UUID as an idempotency key. Repeating the same request returns the existing reservation; changing its details returns a conflict.
-- View reservation history by email and cancel a confirmed reservation. Cancellation releases inventory and records a simulated refund.
-- Give staff a protected screen for editing room types, capacity, inventory, and nightly rates.
+- Search Lisbon hotels by destination, dates, and guest count; compare availability and daily rates.
+- Reserve by room type. PostgreSQL stores daily inventory, supports up to 10% overbooking, and uses version-checked updates for concurrent bookings.
+- Replay a reservation with its UUID as an idempotency key. Reusing that key with changed details returns a conflict.
+- Read reservation history by email and cancel a confirmed reservation. Cancellation releases inventory and records a simulated refund.
+- Let staff edit room types, capacity, inventory, and nightly rates behind the admin key.
 
-The seeded catalog has two Lisbon hotels. Payments are intentionally simulated: the demo does not collect card details or contact a hotel.
+The seeded catalog contains two Lisbon hotels. Payments are simulated; the demo does not collect card details or contact a hotel.
 
 ## Architecture
 
-| Component | Responsibility |
-| --- | --- |
-| `hotel-service` | Hotel and room type catalog, including staff updates |
-| `rate-service` | Per-night quotes, weekday/weekend rates, and staff rate schedules |
-| `reservation-service` | Search, date inventory, bookings, idempotency, cancellation |
-| `payment-service` | Idempotent demo charges and refunds |
-| `service-common` | Shared API errors, health endpoint, and staff-key filter |
-| React web app | Search, stay details, checkout, history, and staff flow |
-| PostgreSQL | Catalog, rates, payments, and reservation inventory schemas |
+The backend is split into five Spring Boot services: hotel catalog, rates, payments, reservations, and shared API concerns. Each business service uses the same dependency direction:
 
-The browser talks to the React app through Nginx. Nginx routes API calls to the four services. Each microservice has two Kind replicas; the web deployment also has two replicas. PostgreSQL uses one StatefulSet replica and a persistent volume for this local demo.
+| Layer | Responsibility |
+| --- | --- |
+| `domain` | Business concepts and invariants such as hotel, reservation, payment status, and rate period |
+| `application/command` | State-changing use cases and command handlers |
+| `application/query` | Read use cases and query handlers |
+| `application/port` | Interfaces for persistence and calls to other services |
+| `adapter/in/web` | HTTP controllers and API mapping |
+| `adapter/out/jdbc` | Database implementations of persistence ports |
+| `adapter/out/http` | Reservation service clients for catalog, rates, and payments |
+
+Commands and queries have separate application interfaces and handlers. Domain objects enforce their own valid state. Application code depends on ports; JDBC, HTTP, and Spring MVC remain adapters around those use cases. This keeps business rules testable without changing the public routes, request headers, or JSON response fields.
+
+The React app follows the same direction:
+
+| Frontend area | Responsibility |
+| --- | --- |
+| `src/domain` | Booking and search validation rules |
+| `src/application` | Hotel query and command interfaces |
+| `src/infrastructure` | HTTP gateway implementing the application interfaces |
+| `src/presentation` | React screens and interaction flow |
+| `src/main.tsx` | Composition of the HTTP gateway and presentation |
+
+`frontend/src/styles.css` retains the existing design system. The API-facing gateway continues to call the same `/api` routes and uses the same request and response contracts.
 
 ## Run on local Kind
 
@@ -40,19 +50,14 @@ Requirements: Docker, Kind, kubectl, and `openssl`.
 ./scripts/kind-up.sh
 ```
 
-Open [http://localhost:8080](http://localhost:8080). The script creates the `hotel-reservation` cluster, builds and loads local images, and deploys the app. It generates local database and staff keys in `.kind-db-password` and `.kind-admin-key`; the staff screen uses the value from `.kind-admin-key`. Those files are ignored by Git.
+Open [http://localhost:8080](http://localhost:8080). The script creates the `hotel-reservation` cluster, builds and loads local images, and deploys the app. It generates local database and staff keys in `.kind-db-password` and `.kind-admin-key`; those files are ignored by Git.
 
 ```bash
 ./scripts/kind-down.sh
-```
-
-To inspect the deployment:
-
-```bash
 kubectl -n hotel-reservation get deployments,pods,services
 ```
 
-## Main API routes
+## HTTP API contracts
 
 | Route | Purpose |
 | --- | --- |
@@ -62,67 +67,79 @@ kubectl -n hotel-reservation get deployments,pods,services
 | `POST /api/reservations` | Create or replay a reservation |
 | `GET /api/reservations?email=…` | Read a guest’s reservation history |
 | `DELETE /api/reservations/{id}` | Cancel a reservation and refund the demo payment |
-| `POST /api/admin/hotels/{hotelId}/room-types` | Add a room type (requires `X-Admin-Key`) |
-| `PUT /api/admin/room-types/{id}` | Update a room type (requires `X-Admin-Key`) |
-| `PUT /api/admin/inventory` | Update future inventory (requires `X-Admin-Key`) |
-| `PUT /api/admin/rates` | Update one nightly rate (requires `X-Admin-Key`) |
-
-The local API is for a design exercise, not a production payment or hotel booking service.
+| `POST /api/admin/hotels/{hotelId}/room-types` | Add a room type (`X-Admin-Key`) |
+| `PUT /api/admin/room-types/{id}` | Update a room type (`X-Admin-Key`) |
+| `PUT /api/admin/inventory` | Update future inventory (`X-Admin-Key`) |
+| `PUT /api/admin/rates` | Update one nightly rate (`X-Admin-Key`) |
 
 ## Quality checks
 
+Frontend checks:
+
 ```bash
-# Frontend checks
 cd frontend
 npm ci
 npm test
 npm run build
 npm run lint
+```
 
-# Java 25 + PostgreSQL integration tests (Docker socket required)
+Java integration tests and JaCoCo reports (Docker socket required):
+
+```bash
 cd ..
 docker run --rm --network=host \
   -v "$PWD":/workspace \
   -v "$HOME/.m2":/root/.m2 \
   -v /var/run/docker.sock:/var/run/docker.sock \
-  -w /workspace maven:3.9-eclipse-temurin-25 mvn -B verify
+  -w /workspace maven:3.9-eclipse-temurin-25 mvn -B clean verify
 ```
 
-Coverage is reported by Vitest and JaCoCo. The verified frontend line coverage is **91.17%** and combined Java line coverage is **83.80%**. SonarCloud results and the local visual QA status are recorded in the analysis below.
+The verified frontend suite has **15 passing tests** and **92.15% line coverage**. The Java suite has **24 passing tests** and **86.31% aggregate line coverage** across JaCoCo reports.
 
-SonarQube Cloud project: [Hotel Reservation System](https://sonarcloud.io/project/overview?id=marcelomiyake_hotel-dry-kiss-yagni). Project configuration is in `sonar-project.properties`.
+SonarQube Cloud project: [Hotel Reservation System · DDD Clean Architecture CQRS](https://sonarcloud.io/project/overview?id=marcelomiyake_hotel-dry-kiss-yagni-refactored-ddd-cleanarch-cqrs). The project uses CI-based analysis so it can import JaCoCo and frontend LCOV reports. SonarCloud documents coverage import for CI-based analysis in its [test coverage guide](https://docs.sonarsource.com/sonarqube-cloud/analyzing-source-code/test-coverage/overview).
 
-## Analysis
+To run the Maven scanner locally, export `SONAR_TOKEN` in your shell and run:
+
+```bash
+docker run --rm --network=host \
+  -e SONAR_TOKEN \
+  -v "$PWD":/workspace \
+  -v "$HOME/.m2":/root/.m2 \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  -w /workspace maven:3.9-eclipse-temurin-25 \
+  mvn -B clean verify org.sonarsource.scanner.maven:sonar-maven-plugin:sonar \
+  -Dsonar.host.url=https://sonarcloud.io
+```
+
+For Lighthouse, build and serve the production frontend with `npm run preview -- --host 0.0.0.0`, then audit `http://localhost:4173/` with the desktop preset. The checked build scored **100** for performance, accessibility, best practices, and SEO; its experimental agentic-browsing readiness checks scored **1.0**. The SEO metadata includes the page title and description, Open Graph and Twitter fields, TravelAgency JSON-LD, `robots.txt`, and `llms.txt`.
+
+## Analysis record
 
 ### Prompt
 
-> Implement https://bytebytego.com/courses/system-design-interview/hotel-reservation-system in Java 25, React 19.3 (handoff from OpenDesign [To start it, from ~/.local/share/open-design, run ./node_modules/.bin/tools-dev start. Web UI: http://127.0.0.1:41919, self-hosted]), PostgreSQL, and Kubernetes via local Kind (2 replicas for each microservice). Use SonarQube Cloud via Chrome (https://sonarcloud.io/organizations/marcelomiyake/) to create and manage these monorepo projects, and complete this job with zero SonarQube issues and test coverage above 80%. If you need to run the scanner from the command line, I updated ~/.zshrc with the SONAR_TOKEN, but you can also use GitHub Actions and push commits in a loop until the issues are clean; if you generate another SONAR_KEY, update it in the GitHub project or in .zshrc. The frontend should have a perfect Lighthouse grade and good SEO META in 1 Click. Finally, update the README.md with a screenshot and an analysis that includes this prompt, the harness used here (Codex, GPT-6 Luna with max effort), and the token costs from the sessions to complete this task (input tokens, cache tokens, reasoning tokens, output tokens) and LOC. The cache and sessions were empty just before starting this session. Consult the OpenAI official documentation for token prices to estimate total costs. This implementation must follow DRY, KISS, and YAGNI in the backend and frontend.
+> This is a fork of https://github.com/marcelomiyake/hotel-dry-kiss-yagni, and now this implementation must follow DDD, Clean Architecture, SOLID, and CQRS in the backend and frontend. Retain the same design system and API contracts. Use SonarQube Cloud via Chrome (https://sonarcloud.io/organizations/marcelomiyake/) to create new SonarQube projects, manage them, and complete this job with zero SonarQube issues and test coverage above 80%. If you need to run the scanner from the command line, I updated ~/.zshrc with the SONAR_TOKEN. Still, you can also use GitHub Actions and push commits in a loop until the issues are clean (the problem is that Rust is not supported for automatic analysis (https://docs.sonarsource.com/sonarqube-cloud/analyzing-source-code/automatic-analysis#supported-languages), so use another approach to consider Rust code in SonarQube Cloud (https://docs.sonarsource.com/sonarqube-server/analyzing-source-code/languages/rust); if you generate another SONAR_KEY, update it in the GitHub project or in .zshrc. The frontend should have a perfect Lighthouse grade and good SEO META in 1 Click. Finally, update the README.md with an analysis that includes this prompt, the harness used here (Codex, GPT-6 Luna with max effort), and the token costs from the sessions to complete this task (input tokens, cache tokens, reasoning tokens, output tokens) and LOC. The cache and sessions were empty just before starting this session. Consult the OpenAI official documentation for token prices to estimate total costs.
 
-### Build record
+### Session and measurements
 
 | Measure | Result |
 | --- | --- |
-| Harness | Codex · GPT-6 Luna · maximum effort |
-| Tests | 13 frontend tests and 19 Java tests passed |
-| Frontend coverage | 91.17% lines (Vitest) |
-| Backend coverage | 83.80% combined Java lines (JaCoCo) |
-| SonarCloud | 0 open issues; quality gate passed; 85.2% overall coverage and 88.3% new-code coverage; one nonblocking missing-blame warning for uncommitted files |
-| Local Kind deployment | Not started: localhost:8080 already had a listener |
-| Screenshot | Captured from the production React build in a local preview (`docs/screenshots/hotel-reservation-home.png`) |
-| Lighthouse | Not run: local deployment stopped because port 8080 was occupied |
-| Production LOC | 3,814 nonblank lines across 74 source/config files |
-| Test LOC | 759 nonblank lines across 11 test files |
+| Harness | Codex · GPT-6 Luna · max effort |
+| Frontend tests | 15 passed; 92.15% line coverage |
+| Backend tests | 24 passed; 86.31% aggregate Java line coverage |
+| SonarQube Cloud | Results recorded after CI-based scan below |
+| Lighthouse | 100 / 100 / 100 / 100 for performance, accessibility, best practices, and SEO; 1.0 agentic-browsing readiness |
+| Production source LOC | 3,614 nonblank lines across 88 Java, TypeScript, TSX, and CSS files |
+| Test source LOC | 884 nonblank lines across 15 Java and TypeScript test files |
 
-Token counters are from the final Codex thread usage record for this task; the session and cache started empty per the prompt. Cached input is a subset of input, and reasoning is included in output, so neither is double-counted in the estimate. The estimate uses the official [OpenAI Codex token-based rate card](https://help.openai.com/en/articles/20001415-chatgpt-rate-card-enterprise-token-based-pricing): $0.10 / 1M uncached input tokens, $0.01 / 1M cached input tokens, and $0.50 / 1M output tokens.
+The LOC count excludes blank lines, generated output, dependencies, assets, documentation, and configuration. Token counts are from this Codex thread; cached input is included in input, and reasoning is included in output.
 
 | Token measure | Count |
 | --- | ---: |
-| Input tokens | 55,861,035 |
-| Cached input tokens | 54,655,104 |
-| Reasoning tokens (included in output) | 196,332 |
-| Output tokens | 347,069 |
-| Estimated model-token cost | $0.84 |
-| Estimated web-search feature cost | $0.15 for 15 runs, if billed at the listed rate |
-| Estimated total | **$0.99** |
+| Input tokens | 17,040,820 |
+| Cached input tokens | 16,643,968 |
+| Reasoning tokens (included in output) | 54,012 |
+| Output tokens | 103,205 |
+| Estimated model-token cost | **$0.26** |
 
-The model-token estimate is `(input − cached input) × $0.10/M + cached input × $0.01/M + output × $0.50/M`. The input count includes cached input, and reasoning tokens are part of output; neither is double-counted. The web-search estimate applies the listed $10 per 1,000 runs to 15 web-tool calls. These estimates use the official rate card and are not an invoice; actual billing depends on the workspace agreement.
+Estimate: `(input − cached input) × $0.10/M + cached input × $0.01/M + output × $0.50/M`, using the official [OpenAI ChatGPT rate card](https://help.openai.com/en/articles/20001415-chatgpt-rate-card-enterprise-token-based-pricing). This is a token-price estimate at the published rates, not an invoice; workspace billing terms may differ.

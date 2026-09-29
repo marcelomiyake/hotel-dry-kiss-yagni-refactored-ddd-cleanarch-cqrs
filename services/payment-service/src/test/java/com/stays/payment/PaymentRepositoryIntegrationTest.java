@@ -7,6 +7,7 @@ import java.math.BigDecimal;
 import java.util.UUID;
 
 import com.stays.common.ApiException;
+import com.stays.payment.application.command.PaymentCommands;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -33,7 +34,7 @@ class PaymentRepositoryIntegrationTest {
     }
 
     @Autowired
-    private PaymentRepository payments;
+    private PaymentCommands payments;
 
     @Test
     void chargesIdempotentlyAndRefundsOnce() {
@@ -42,10 +43,10 @@ class PaymentRepositoryIntegrationTest {
         Payment first = payments.charge(request);
         Payment retry = payments.charge(new PaymentRequest(reservationId, new BigDecimal("250.00"), "guest@example.com"));
         assertThat(retry.id()).isEqualTo(first.id());
-        assertThat(retry.status()).isEqualTo("PAID");
+        assertThat(retry.status()).hasToString("PAID");
 
-        assertThat(payments.refund(reservationId).status()).isEqualTo("REFUNDED");
-        assertThat(payments.refund(reservationId).status()).isEqualTo("REFUNDED");
+        assertThat(payments.refund(reservationId).status()).hasToString("REFUNDED");
+        assertThat(payments.refund(reservationId).status()).hasToString("REFUNDED");
     }
 
     @Test

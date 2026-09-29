@@ -8,6 +8,8 @@ import java.time.LocalDate;
 import java.util.UUID;
 
 import com.stays.common.ApiException;
+import com.stays.rate.application.command.RateCommands;
+import com.stays.rate.application.query.RateQueries;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -35,7 +37,10 @@ class RateRepositoryIntegrationTest {
     }
 
     @Autowired
-    private RateRepository rates;
+    private RateQueries queries;
+
+    @Autowired
+    private RateCommands commands;
 
     @Autowired
     private JdbcTemplate jdbc;
@@ -44,11 +49,11 @@ class RateRepositoryIntegrationTest {
     void quotesAndUpdatesNightlyRates() {
         UUID roomId = UUID.randomUUID();
         LocalDate start = LocalDate.now().plusDays(20);
-        rates.setRate(new RateDraft(roomId, start, new BigDecimal("125.50")));
-        rates.setRate(new RateDraft(roomId, start.plusDays(1), new BigDecimal("175.00")));
-        rates.setRate(new RateDraft(roomId, start, new BigDecimal("130.00")));
+        commands.setRate(new RateDraft(roomId, start, new BigDecimal("125.50")));
+        commands.setRate(new RateDraft(roomId, start.plusDays(1), new BigDecimal("175.00")));
+        commands.setRate(new RateDraft(roomId, start, new BigDecimal("130.00")));
 
-        RateQuote quote = rates.quote(roomId, start, start.plusDays(2));
+        RateQuote quote = queries.quote(roomId, start, start.plusDays(2));
         assertThat(quote.nights()).hasSize(2);
         assertThat(quote.total()).isEqualByComparingTo("305.00");
         assertThat(quote.nights().getFirst().amount()).isEqualByComparingTo("130.00");
@@ -61,19 +66,19 @@ class RateRepositoryIntegrationTest {
         LocalDate noNights = start;
         LocalDate beyondSchedule = start.plusDays(366);
         LocalDate missingRate = start.plusDays(1);
-        assertThatThrownBy(() -> rates.quote(roomId, start, noNights)).isInstanceOf(ApiException.class);
-        assertThatThrownBy(() -> rates.quote(roomId, start, beyondSchedule)).isInstanceOf(ApiException.class);
-        assertThatThrownBy(() -> rates.quote(roomId, start, missingRate)).isInstanceOf(ApiException.class);
+        assertThatThrownBy(() -> queries.quote(roomId, start, noNights)).isInstanceOf(ApiException.class);
+        assertThatThrownBy(() -> queries.quote(roomId, start, beyondSchedule)).isInstanceOf(ApiException.class);
+        assertThatThrownBy(() -> queries.quote(roomId, start, missingRate)).isInstanceOf(ApiException.class);
     }
 
     @Test
     void createsAFullYearScheduleWithWeekendPricing() {
         UUID roomId = UUID.randomUUID();
-        rates.createSchedule(new RateSchedule(roomId, new BigDecimal("200.00")));
+        commands.createSchedule(new RateSchedule(roomId, new BigDecimal("200.00")));
         Integer count = jdbc.queryForObject(
                 "SELECT count(*) FROM nightly_rates.rates WHERE room_type_id = ?", Integer.class, roomId);
         assertThat(count).isEqualTo(731);
-        assertThat(rates.quote(roomId, LocalDate.now().plusDays(10), LocalDate.now().plusDays(11)).nights())
+        assertThat(queries.quote(roomId, LocalDate.now().plusDays(10), LocalDate.now().plusDays(11)).nights())
                 .hasSize(1);
     }
 }

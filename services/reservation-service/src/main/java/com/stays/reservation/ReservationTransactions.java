@@ -3,6 +3,9 @@ package com.stays.reservation;
 import java.math.BigDecimal;
 import java.util.UUID;
 
+import com.stays.reservation.application.port.InventoryPort;
+import com.stays.reservation.application.port.ReservationStore;
+import com.stays.reservation.domain.ReservationStatus;
 import com.stays.common.ApiException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -10,10 +13,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class ReservationTransactions {
-    private final ReservationRepository reservations;
-    private final InventoryRepository inventory;
+    private final ReservationStore reservations;
+    private final InventoryPort inventory;
 
-    public ReservationTransactions(ReservationRepository reservations, InventoryRepository inventory) {
+    public ReservationTransactions(ReservationStore reservations, InventoryPort inventory) {
         this.reservations = reservations;
         this.inventory = inventory;
     }
@@ -41,7 +44,7 @@ public class ReservationTransactions {
     @Transactional
     public Reservation cancel(UUID reservationId) {
         Reservation reservation = reservations.require(reservationId);
-        if ("CANCELLED".equals(reservation.status())) {
+        if (reservation.status() == ReservationStatus.CANCELLED) {
             return reservation;
         }
         inventory.release(

@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { HotelApp } from "../src/App";
+import { HttpHotelGateway } from "../src/infrastructure/HttpHotelGateway";
 import type { Hotel, Reservation, SearchResponse, SearchStay } from "../src/types";
 
 const firstRoom = {
@@ -84,6 +85,12 @@ function setFetch(...responses: Response[]) {
   return fetchMock;
 }
 
+const hotelGateway = new HttpHotelGateway();
+
+function renderHotelApp() {
+  return render(<HotelApp queries={hotelGateway} commands={hotelGateway} />);
+}
+
 beforeEach(() => {
   vi.spyOn(crypto, "randomUUID").mockReturnValue("11111111-2222-4333-8444-555555555555");
 });
@@ -102,7 +109,7 @@ describe("hotel reservation experience", () => {
       response([booking]),
       response({ ...booking, status: "CANCELLED" }),
     );
-    render(<HotelApp />);
+    renderHotelApp();
     expect(screen.getByRole("heading", { name: "Find a stay that feels like Lisbon." })).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText("Destination"), { target: { value: " " } });
@@ -145,7 +152,7 @@ describe("hotel reservation experience", () => {
       .mockRejectedValueOnce(new Error("Network unavailable"))
       .mockResolvedValueOnce(response({ ...searchResult, stays: [] }));
     vi.stubGlobal("fetch", fetchMock);
-    render(<HotelApp />);
+    renderHotelApp();
     fireEvent.click(screen.getByRole("button", { name: "Search stays" }));
     expect(await screen.findByRole("heading", { name: "We couldn’t check availability." })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Try search again" }));
@@ -159,7 +166,7 @@ describe("hotel reservation experience", () => {
       .mockResolvedValueOnce(response([booking]))
       .mockRejectedValueOnce(new Error("History unavailable"));
     vi.stubGlobal("fetch", fetchMock);
-    render(<HotelApp />);
+    renderHotelApp();
     fireEvent.click(screen.getByRole("button", { name: "My bookings" }));
     expect(await screen.findByRole("heading", { name: "No bookings found for this email." })).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("Email address used for booking"), { target: { value: "alex@example.com" } });
@@ -171,7 +178,7 @@ describe("hotel reservation experience", () => {
   });
 
   it("requires email to look up history", async () => {
-    render(<HotelApp />);
+    renderHotelApp();
     fireEvent.click(screen.getByRole("button", { name: "My bookings" }));
     fireEvent.change(screen.getByLabelText("Email address used for booking"), { target: { value: "" } });
     fireEvent.submit(screen.getByRole("button", { name: "Find bookings" }).closest("form")!);
@@ -194,7 +201,7 @@ describe("hotel reservation experience", () => {
       .mockResolvedValueOnce(response(null, 204))
       .mockResolvedValueOnce(response(hotelCatalog));
     vi.stubGlobal("fetch", fetchMock);
-    render(<HotelApp />);
+    renderHotelApp();
     fireEvent.click(screen.getByRole("button", { name: "Staff" }));
     expect(await screen.findByRole("heading", { name: "Staff room management" })).toBeInTheDocument();
     await screen.findByLabelText("Room name");
@@ -227,7 +234,7 @@ describe("hotel reservation experience", () => {
       .mockResolvedValueOnce(response(hotelCatalog))
       .mockRejectedValueOnce(new Error("Staff update failed"));
     vi.stubGlobal("fetch", fetchMock);
-    render(<HotelApp />);
+    renderHotelApp();
     fireEvent.click(screen.getByRole("button", { name: "Staff" }));
     await screen.findByLabelText("Room name");
     fireEvent.change(screen.getByLabelText("Staff key"), { target: { value: "staff-test-key" } });
@@ -237,7 +244,7 @@ describe("hotel reservation experience", () => {
 
   it("reports staff catalog load errors", async () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("Catalog unavailable")));
-    render(<HotelApp />);
+    renderHotelApp();
     fireEvent.click(screen.getByRole("button", { name: "Staff" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Catalog unavailable");
   });

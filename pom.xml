@@ -27,10 +27,9 @@
     <sonar.java.source>25</sonar.java.source>
     <sonar.java.jdkHome>${java.home}</sonar.java.jdkHome>
     <sonar.organization>marcelomiyake</sonar.organization>
-    <sonar.projectKey>marcelomiyake_hotel-dry-kiss-yagni</sonar.projectKey>
-    <sonar.projectName>Hotel Reservation System</sonar.projectName>
+    <sonar.projectKey>marcelomiyake_hotel-dry-kiss-yagni-refactored-ddd-cleanarch-cqrs</sonar.projectKey>
+    <sonar.projectName>Hotel Reservation System - DDD Clean Architecture CQRS</sonar.projectName>
     <sonar.maven.scanAll>true</sonar.maven.scanAll>
-    <sonar.test.inclusions>frontend/test/**/*</sonar.test.inclusions>
     <sonar.javascript.lcov.reportPaths>${maven.multiModuleProjectDirectory}/frontend/coverage/lcov.info</sonar.javascript.lcov.reportPaths>
     <sonar.exclusions>**/node_modules/**,**/target/**,**/dist/**,**/coverage/**</sonar.exclusions>
   </properties>

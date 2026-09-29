@@ -3,6 +3,10 @@ package com.stays.reservation;
 import java.math.BigDecimal;
 import java.util.UUID;
 
+import com.stays.reservation.application.port.CatalogPort;
+import com.stays.reservation.application.port.PaymentPort;
+import com.stays.reservation.application.port.RateQuotePort;
+import com.stays.reservation.domain.ReservationStatus;
 import com.stays.common.ApiException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
@@ -10,15 +14,15 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class ReservationService {
-    private final CatalogClient catalog;
-    private final RateClient rates;
-    private final PaymentClient payments;
+    private final CatalogPort catalog;
+    private final RateQuotePort rates;
+    private final PaymentPort payments;
     private final ReservationTransactions transactions;
 
     public ReservationService(
-            CatalogClient catalog,
-            RateClient rates,
-            PaymentClient payments,
+            CatalogPort catalog,
+            RateQuotePort rates,
+            PaymentPort payments,
             ReservationTransactions transactions) {
         this.catalog = catalog;
         this.rates = rates;
@@ -40,10 +44,10 @@ public class ReservationService {
         } catch (DataIntegrityViolationException _) {
             reservation = transactions.find(request.reservationId());
         }
-        if ("CONFIRMED".equals(reservation.status())) {
+        if (reservation.status() == ReservationStatus.CONFIRMED) {
             return reservation;
         }
-        if (!"PAYMENT_PENDING".equals(reservation.status())) {
+        if (reservation.status() != ReservationStatus.PAYMENT_PENDING) {
             throw new ApiException(HttpStatus.CONFLICT, "reservation_closed", "This reservation cannot be completed.");
         }
         Payment payment = payments.charge(new PaymentRequest(request.reservationId(), reservation.total(), request.guestEmail()));
@@ -52,10 +56,10 @@ public class ReservationService {
 
     public Reservation cancel(UUID id) {
         Reservation current = transactions.find(id);
-        if ("CANCELLED".equals(current.status())) {
+        if (current.status() == ReservationStatus.CANCELLED) {
             return current;
         }
-        if ("CONFIRMED".equals(current.status())) {
+        if (current.status() == ReservationStatus.CONFIRMED) {
             payments.refund(id);
         }
         return transactions.cancel(id);
