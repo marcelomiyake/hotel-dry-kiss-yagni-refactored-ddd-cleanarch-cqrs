@@ -97,22 +97,18 @@ docker run --rm --network=host \
 
 The verified frontend suite has **15 passing tests** and **92.15% line coverage**. The Java suite has **24 passing tests** and **86.31% aggregate line coverage** across JaCoCo reports.
 
-SonarQube Cloud project: [Hotel Reservation System · DDD Clean Architecture CQRS](https://sonarcloud.io/project/overview?id=marcelomiyake_hotel-dry-kiss-yagni-refactored-ddd-cleanarch-cqrs). The project uses CI-based analysis so it can import JaCoCo and frontend LCOV reports. SonarCloud documents coverage import for CI-based analysis in its [test coverage guide](https://docs.sonarsource.com/sonarqube-cloud/analyzing-source-code/test-coverage/overview).
+SonarQube Cloud project: [Hotel Reservation System · DDD Clean Architecture CQRS](https://sonarcloud.io/project/overview?id=marcelomiyake_hotel-dry-kiss-yagni-refactored-ddd-cleanarch-cqrs). The CI-based SonarScanner CLI analysis includes Java, TypeScript, and CSS, imports the JaCoCo and frontend LCOV reports, and currently reports **0 open issues**, **86.6% overall coverage**, and a **passed quality gate**. SonarCloud documents coverage import for CI-based analysis in its [test coverage guide](https://docs.sonarsource.com/sonarqube-cloud/analyzing-source-code/test-coverage/overview).
 
-To run the Maven scanner locally, export `SONAR_TOKEN` in your shell and run:
+After generating the frontend and Java coverage reports with the commands above, export `SONAR_TOKEN` and run the scanner from the repository root:
 
 ```bash
 docker run --rm --network=host \
-  -e SONAR_TOKEN \
-  -v "$PWD":/workspace \
-  -v "$HOME/.m2":/root/.m2 \
-  -v /var/run/docker.sock:/var/run/docker.sock \
-  -w /workspace maven:3.9-eclipse-temurin-25 \
-  mvn -B clean verify org.sonarsource.scanner.maven:sonar-maven-plugin:sonar \
-  -Dsonar.host.url=https://sonarcloud.io
+  -e SONAR_TOKEN -e SONAR_HOST_URL=https://sonarcloud.io \
+  -v "$PWD":/usr/src \
+  -w /usr/src sonarsource/sonar-scanner-cli:latest
 ```
 
-For Lighthouse, build and serve the production frontend with `npm run preview -- --host 0.0.0.0`, then audit `http://localhost:4173/` with the desktop preset. The checked build scored **100** for performance, accessibility, best practices, and SEO; its experimental agentic-browsing readiness checks scored **1.0**. The SEO metadata includes the page title and description, Open Graph and Twitter fields, TravelAgency JSON-LD, `robots.txt`, and `llms.txt`.
+For Lighthouse, build and serve the production frontend with `npm run preview -- --host 0.0.0.0`, then audit `http://localhost:4173/` with the desktop preset. The checked build scored **100** for performance, accessibility, best practices, and SEO; its experimental agentic-browsing readiness checks scored **1.0**. SEO metadata includes the page title and description, Open Graph and Twitter fields, TravelAgency JSON-LD, `robots.txt`, `llms.txt`, and an AI Catalog manifest.
 
 ## Analysis record
 
@@ -127,19 +123,19 @@ For Lighthouse, build and serve the production frontend with `npm run preview --
 | Harness | Codex · GPT-6 Luna · max effort |
 | Frontend tests | 15 passed; 92.15% line coverage |
 | Backend tests | 24 passed; 86.31% aggregate Java line coverage |
-| SonarQube Cloud | Results recorded after CI-based scan below |
+| SonarQube Cloud | 0 open issues; 86.6% overall coverage; quality gate passed |
 | Lighthouse | 100 / 100 / 100 / 100 for performance, accessibility, best practices, and SEO; 1.0 agentic-browsing readiness |
 | Production source LOC | 3,614 nonblank lines across 88 Java, TypeScript, TSX, and CSS files |
-| Test source LOC | 884 nonblank lines across 15 Java and TypeScript test files |
+| Test source LOC | 890 nonblank lines across 15 Java and TypeScript test files |
 
-The LOC count excludes blank lines, generated output, dependencies, assets, documentation, and configuration. Token counts are from this Codex thread; cached input is included in input, and reasoning is included in output.
+The LOC count excludes blank lines, generated output, dependencies, assets, documentation, and configuration. The session and cache counters were empty before the task. Token counts are from this Codex thread; cached input is included in input, and reasoning is included in output.
 
 | Token measure | Count |
 | --- | ---: |
-| Input tokens | 17,040,820 |
-| Cached input tokens | 16,643,968 |
-| Reasoning tokens (included in output) | 54,012 |
-| Output tokens | 103,205 |
-| Estimated model-token cost | **$0.26** |
+| Input tokens | 26,986,294 |
+| Cached input tokens | 26,324,096 |
+| Reasoning tokens (included in output) | 86,433 |
+| Output tokens | 144,957 |
+| Estimated model-token cost | **$0.40** |
 
 Estimate: `(input − cached input) × $0.10/M + cached input × $0.01/M + output × $0.50/M`, using the official [OpenAI ChatGPT rate card](https://help.openai.com/en/articles/20001415-chatgpt-rate-card-enterprise-token-based-pricing). This is a token-price estimate at the published rates, not an invoice; workspace billing terms may differ.
