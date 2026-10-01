@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState, type RefObject, type SubmitEvent } from "react";
-import type { HotelCommands } from "../application/HotelCommands";
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject, type SubmitEvent } from "react";
+import type { HotelCommands, ReservationProgressScreen } from "../application/HotelCommands";
 import type { HotelQueries } from "../application/HotelQueries";
 import { hasValidGuestDetails, isValidEmail, validateSearch } from "../domain/booking";
 import { addDays, formatDate, formatMoney, getNights, localDateOffset } from "../date";
@@ -84,6 +84,8 @@ export function HotelApp({ queries, commands }: HotelAppProps) {
   const pageHeadingRef = useRef<HTMLHeadingElement>(null);
   const cancelDialogRef = useRef<HTMLDialogElement>(null);
   const bookingIdRef = useRef("");
+  const progressSessionIdRef = useRef<string | null>(null);
+  const progressEventsRef = useRef<Promise<void>>(Promise.resolve());
   const previousViewRef = useRef(view);
 
   const orderedStays = useMemo(() => {
@@ -99,6 +101,22 @@ export function HotelApp({ queries, commands }: HotelAppProps) {
   const selectedRoom = activeStay?.rooms.find((room) => room.id === selectedRoomId) ?? activeStay?.rooms[0] ?? null;
   const cancelTarget = bookings.find((booking) => booking.id === pendingCancel) ?? null;
   const exploreCurrent = ["search", "results", "details", "checkout", "confirmation"].includes(view);
+
+  const recordReservationProgress = useCallback((sessionId: string, screen: ReservationProgressScreen) => {
+    const nextEvent = progressEventsRef.current.then(() => commands.recordReservationProgress(sessionId, screen));
+    progressEventsRef.current = nextEvent.catch(() => undefined);
+  }, [commands]);
+
+  useEffect(() => {
+    if (view === "details") {
+      const sessionId = progressSessionIdRef.current ?? crypto.randomUUID();
+      progressSessionIdRef.current = sessionId;
+      recordReservationProgress(sessionId, "DETAILS");
+    }
+    if (view === "checkout" && progressSessionIdRef.current) {
+      recordReservationProgress(progressSessionIdRef.current, "CHECKOUT");
+    }
+  }, [recordReservationProgress, view]);
 
   useEffect(() => {
     if (previousViewRef.current !== view) {
@@ -204,6 +222,10 @@ export function HotelApp({ queries, commands }: HotelAppProps) {
         guestName: guest.name.trim(),
         guestEmail: guest.email.trim(),
       });
+      if (progressSessionIdRef.current) {
+        recordReservationProgress(progressSessionIdRef.current, "CONFIRMATION");
+        progressSessionIdRef.current = null;
+      }
       bookingIdRef.current = "";
       setConfirmedBooking(booking);
       setBookings((previous) => [booking, ...previous.filter((item) => item.id !== booking.id)]);

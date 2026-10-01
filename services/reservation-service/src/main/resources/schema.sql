@@ -37,6 +37,33 @@ CREATE TABLE IF NOT EXISTS reservations.bookings (
 CREATE INDEX IF NOT EXISTS bookings_email_created_idx
     ON reservations.bookings (lower(guest_email), created_at DESC);
 
+CREATE TABLE IF NOT EXISTS reservations.reservation_funnel_sessions (
+    session_id uuid PRIMARY KEY,
+    status varchar(16) NOT NULL CHECK (status IN ('IN_PROGRESS', 'ABANDONED', 'COMPLETED')),
+    last_screen varchar(24) NOT NULL CHECK (last_screen IN ('DETAILS', 'CHECKOUT', 'CONFIRMATION')),
+    started_at timestamptz NOT NULL,
+    last_activity_at timestamptz NOT NULL,
+    abandoned_at timestamptz,
+    completed_at timestamptz,
+    CHECK ((status = 'ABANDONED') = (abandoned_at IS NOT NULL)),
+    CHECK ((status = 'COMPLETED') = (completed_at IS NOT NULL))
+);
+
+CREATE INDEX IF NOT EXISTS reservation_funnel_in_progress_idx
+    ON reservations.reservation_funnel_sessions (last_activity_at)
+    WHERE status = 'IN_PROGRESS';
+
+CREATE TABLE IF NOT EXISTS reservations.reservation_funnel_events (
+    event_id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    session_id uuid NOT NULL REFERENCES reservations.reservation_funnel_sessions (session_id),
+    event_type varchar(24) NOT NULL CHECK (event_type IN ('STARTED', 'SCREEN_VIEWED', 'ABANDONED', 'COMPLETED')),
+    screen varchar(24) NOT NULL CHECK (screen IN ('DETAILS', 'CHECKOUT', 'CONFIRMATION')),
+    recorded_at timestamptz NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS reservation_funnel_events_session_time_idx
+    ON reservations.reservation_funnel_events (session_id, recorded_at);
+
 INSERT INTO reservations.room_inventory (hotel_id, room_type_id, inventory_date, total_inventory)
 SELECT inventory.hotel_id, inventory.room_type_id, stay_date::date, inventory.total_inventory
 FROM (VALUES

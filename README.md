@@ -95,9 +95,9 @@ docker run --rm --network=host \
   -w /workspace maven:3.9-eclipse-temurin-25 mvn -B clean verify
 ```
 
-The verified frontend suite has **15 passing tests** and **92.15% line coverage**. The Java suite has **24 passing tests** and **86.31% aggregate line coverage** across JaCoCo reports.
+The verified frontend suite has **15 passing tests** and **92.49% line coverage**. The Java suite has **28 passing tests** and **87.72% aggregate line coverage** across JaCoCo reports.
 
-SonarQube Cloud project: [Hotel Reservation System · DDD Clean Architecture CQRS](https://sonarcloud.io/project/overview?id=marcelomiyake_hotel-dry-kiss-yagni-refactored-ddd-cleanarch-cqrs). The CI-based SonarScanner CLI analysis includes Java, TypeScript, and CSS, imports the JaCoCo and frontend LCOV reports, and currently reports **0 open issues**, **86.6% overall coverage**, and a **passed quality gate**. SonarCloud documents coverage import for CI-based analysis in its [test coverage guide](https://docs.sonarsource.com/sonarqube-cloud/analyzing-source-code/test-coverage/overview).
+SonarQube Cloud project: [Hotel Reservation System · DDD Clean Architecture CQRS](https://sonarcloud.io/project/overview?id=marcelomiyake_hotel-dry-kiss-yagni-refactored-ddd-cleanarch-cqrs). The CI-based SonarScanner CLI analysis includes Java, TypeScript, and CSS, imports the JaCoCo and frontend LCOV reports, and currently reports **0 open issues**, **87.3% overall coverage**, and a **passed quality gate**. SonarCloud documents coverage import for CI-based analysis in its [test coverage guide](https://docs.sonarsource.com/sonarqube-cloud/analyzing-source-code/test-coverage/overview).
 
 After generating the frontend and Java coverage reports with the commands above, export `SONAR_TOKEN` and run the scanner from the repository root:
 
@@ -111,7 +111,7 @@ docker run --rm --network=host \
   '-Dsonar.java.test.libraries=/maven-repository/**/*.jar'
 ```
 
-For Lighthouse, build and serve the production frontend with `npm run preview -- --host 0.0.0.0`, then audit `http://localhost:4173/` with the desktop preset. The checked build scored **100** for performance, accessibility, best practices, and SEO; its experimental agentic-browsing readiness checks scored **1.0**. SEO metadata includes the page title and description, Open Graph and Twitter fields, TravelAgency JSON-LD, `robots.txt`, `llms.txt`, and an AI Catalog manifest.
+For Lighthouse, build and serve the production frontend with `npm run preview -- --host 0.0.0.0`, then audit `http://localhost:4173/` with the desktop preset. The latest recorded audit scored **100** for performance, accessibility, best practices, and SEO; its experimental agentic-browsing readiness checks scored **1.0**. This reservation tracking feature does not change the page content or metadata; a fresh audit of this revision is pending Chrome DevTools MCP availability. SEO metadata includes the page title and description, Open Graph and Twitter fields, TravelAgency JSON-LD, `robots.txt`, `llms.txt`, and an AI Catalog manifest.
 
 ## Analysis record
 
@@ -142,3 +142,52 @@ The LOC count excludes blank lines, generated output, dependencies, assets, docu
 | Estimated model-token cost | **$0.48** |
 
 Estimate: `(input − cached input) × $0.10/M + cached input × $0.01/M + output × $0.50/M`, using the official [OpenAI ChatGPT rate card](https://help.openai.com/en/articles/20001415-chatgpt-rate-card-enterprise-token-based-pricing). This is a token-price estimate at the published rates, not an invoice; workspace billing terms may differ.
+
+## Reservation abandonment tracking · feature statistics
+
+### Prompt
+
+> I want you to implement a new feature that identifies when a user starts a reservation but abandons it before paying. I want us to track which screen the user stopped at before abandoning the reservation. No administrative frontend implementation is needed; I want the data stored in the database (it doesn't need to be the same existing relational database) so we can use it later to improve the system. So it's not necessary to change the frontend features for the user, but you can change the structure to track user events. In this case, if you change it, the frontend should have a perfect Lighthouse grade and good SEO META in 1 Click. Complete this job with zero SonarQube issues (not only new, but zero in total) and test coverage above 80%. I also want to add a new section to README.md with statistics for this new feature. Include the number of changes (how much was deleted, created, changed, etc.), an analysis that includes this prompt, the harness used here (Codex, GPT-6 Luna with max effort), and the token costs from the sessions to complete this task (input tokens, cache tokens, reasoning tokens, output tokens), plus LOC. The cache and sessions were empty just before starting this session. Consult the OpenAI official documentation for token prices to estimate total costs. Commit following https://www.conventionalcommits.org/and push to GitHub after all.
+
+### Analysis and implementation
+
+The reservation service creates a booking only after checkout is submitted, which leaves earlier abandonment invisible to the backend. The browser now starts an anonymous progress session when a guest opens reservation details, records `DETAILS` and `CHECKOUT` screen events, and records `CONFIRMATION` only after the reservation request succeeds. It sends only a random session UUID and a fixed screen value; it does not send guest name, email, or search details.
+
+PostgreSQL stores a current session row and an append-only event history in `reservations.reservation_funnel_sessions` and `reservations.reservation_funnel_events`. A scheduled service marks a session `ABANDONED` after 30 minutes without activity and records the last screen. The timeout and sweep interval are configurable with `RESERVATION_PROGRESS_INACTIVITY_TIMEOUT` and `RESERVATION_PROGRESS_SWEEP_INTERVAL_MS`. No administrative frontend was added. The frontend’s visible flow and SEO metadata are unchanged.
+
+### Measurements
+
+| Measure | Result |
+| --- | --- |
+| Harness | Codex · GPT-6 Luna · max effort (as specified in the prompt) |
+| Time spent | 34m 40s (active work time provided for this task) |
+| Files created | 9 (7 production files, 2 test files) |
+| Existing files changed | 9 |
+| Files deleted | 0 |
+| Lines added / deleted | 440 / 4 in implementation and tests; excludes this README section |
+| Production source LOC | 3,810 nonblank lines across 95 Java, TypeScript, TSX, and CSS files |
+| Test source LOC | 1,036 nonblank lines across 17 Java and TypeScript test files |
+| Frontend tests | 15 passed; 92.49% line coverage |
+| Java tests | 28 passed; 87.72% aggregate line coverage |
+| SonarQube Cloud | 0 open issues total; 87.3% overall coverage; 89.4% new-code coverage; quality gate passed |
+| Lighthouse | Not re-run for this revision; the `cloudflare:web-perf` skill requires Chrome DevTools MCP, which was unavailable in this session |
+| Cache state at session start | Empty, as stated in the prompt |
+
+The feature adds 7 production Java files and 2 Java test files; frontend changes add progress reporting to the existing gateway and reservation flow, with an integration assertion that only screen values and the anonymous session ID are sent. Coverage figures are from the completed test runs and SonarQube Cloud analysis.
+
+### Token usage and estimated cost
+
+I read the matching Codex session log in `~/.codex/sessions/2026/10/01`. The folder contained one session log for this repository; the counts below come from its latest cumulative thread usage record at `2026-10-01T16:07:48Z`. The session and cache were empty before work began, as stated in the prompt. The [official OpenAI API pricing](https://developers.openai.com/api/docs/pricing?tab=suite) provides the estimate rates for GPT-6 Luna Standard short-context usage; workspace billing terms may differ.
+
+| Token measure | Count / rate |
+| --- | ---: |
+| Input tokens | 8,056,578 |
+| Cached input tokens | 7,867,648 |
+| Reasoning tokens | 39,943 (included in output tokens) |
+| Output tokens | 58,600 |
+| GPT-6 Luna input rate | $0.10 per 1M tokens |
+| GPT-6 Luna cached input rate | $0.01 per 1M tokens |
+| GPT-6 Luna output rate | $0.50 per 1M tokens |
+| Estimated task cost | **$0.1269** |
+
+Estimate: `(input − cached input) × $0.10/M + cached input × $0.01/M + output × $0.50/M`. Reasoning tokens are included in output for this calculation; the cost is rounded to four decimal places and is not an invoice.

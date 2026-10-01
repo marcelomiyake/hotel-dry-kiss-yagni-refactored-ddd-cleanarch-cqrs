@@ -1,5 +1,7 @@
 import type { Reservation, RoomTypeDraft } from "../types";
 
+export type ReservationProgressScreen = "DETAILS" | "CHECKOUT" | "CONFIRMATION";
+
 export interface CreateReservationCommand {
   readonly reservationId: string;
   readonly hotelId: string;
@@ -20,6 +22,8 @@ export interface ChangeInventoryCommand {
 
 export interface HotelCommands {
   createReservation(command: CreateReservationCommand): Promise<Reservation>;
+
+  recordReservationProgress(sessionId: string, screen: ReservationProgressScreen): Promise<void>;
 
   cancelReservation(id: string): Promise<Reservation>;
 

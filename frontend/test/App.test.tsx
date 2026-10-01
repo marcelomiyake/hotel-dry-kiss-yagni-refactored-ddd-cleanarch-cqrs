@@ -79,8 +79,14 @@ function response(data: unknown, status = 200): Response {
 }
 
 function setFetch(...responses: Response[]) {
+  const pendingResponses = [...responses];
   const fetchMock = vi.fn();
-  responses.forEach((result) => fetchMock.mockResolvedValueOnce(result));
+  fetchMock.mockImplementation((input: RequestInfo | URL) => {
+    if (String(input) === "/api/reservation-progress") return Promise.resolve(response(null, 204));
+    const result = pendingResponses.shift();
+    if (!result) return Promise.reject(new Error(`Unexpected request: ${String(input)}`));
+    return Promise.resolve(result);
+  });
   vi.stubGlobal("fetch", fetchMock);
   return fetchMock;
 }
@@ -132,6 +138,13 @@ describe("hotel reservation experience", () => {
     fireEvent.click(screen.getByLabelText(/reviewed the room details/));
     fireEvent.click(screen.getByRole("button", { name: "Confirm reservation" }));
     expect(await screen.findByRole("heading", { name: "Your Lisbon stay is on the list." })).toBeInTheDocument();
+    await waitFor(() => expect(fetchMock.mock.calls.filter(([url]) => url === "/api/reservation-progress")).toHaveLength(3));
+    const progressCalls = fetchMock.mock.calls.filter(([url]) => url === "/api/reservation-progress");
+    expect(progressCalls.map(([, options]) => JSON.parse(options?.body as string))).toEqual([
+      { sessionId: "11111111-2222-4333-8444-555555555555", screen: "DETAILS" },
+      { sessionId: "11111111-2222-4333-8444-555555555555", screen: "CHECKOUT" },
+      { sessionId: "11111111-2222-4333-8444-555555555555", screen: "CONFIRMATION" },
+    ]);
     expect(fetchMock).toHaveBeenCalledWith("/api/reservations", expect.objectContaining({
       method: "POST",
       body: expect.stringContaining('"guestEmail":"alex@example.com"'),

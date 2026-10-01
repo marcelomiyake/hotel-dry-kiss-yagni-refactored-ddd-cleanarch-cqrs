@@ -15,6 +15,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.math.BigDecimal;
+import java.sql.Timestamp;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
@@ -26,6 +28,7 @@ import com.stays.reservation.application.port.CatalogPort;
 import com.stays.reservation.application.port.InventoryPort;
 import com.stays.reservation.application.port.PaymentPort;
 import com.stays.reservation.application.port.RateQuotePort;
+import com.stays.reservation.application.command.ReservationProgressCommands;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -74,6 +77,9 @@ class ReservationFlowIntegrationTest {
 
     @Autowired
     private InventoryPort inventory;
+
+    @Autowired
+    private ReservationProgressCommands progressCommands;
 
     @Autowired
     private JdbcTemplate jdbc;
@@ -202,6 +208,86 @@ class ReservationFlowIntegrationTest {
         mvc.perform(post("/api/reservations").contentType(MediaType.APPLICATION_JSON).content("{}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("invalid_request"));
+    }
+
+    @Test
+    void recordsReservationScreensAndIdentifiesAbandonedAndCompletedSessions() throws Exception {
+        UUID abandonedSession = UUID.randomUUID();
+        recordProgress(abandonedSession, "DETAILS");
+        recordProgress(abandonedSession, "CHECKOUT");
+
+        assertThat(jdbc.queryForObject(
+                "SELECT last_screen FROM reservations.reservation_funnel_sessions WHERE session_id = ?",
+                String.class,
+                abandonedSession)).isEqualTo("CHECKOUT");
+        assertThat(jdbc.queryForObject(
+                "SELECT count(*) FROM reservations.reservation_funnel_events WHERE session_id = ?",
+                Integer.class,
+                abandonedSession)).isEqualTo(2);
+        assertThat(jdbc.queryForObject(
+                "SELECT count(*) FROM reservations.reservation_funnel_events WHERE session_id = ? AND event_type = 'STARTED'",
+                Integer.class,
+                abandonedSession)).isEqualTo(1);
+
+        progressCommands.abandonInactiveSessions();
+        assertThat(jdbc.queryForObject(
+                "SELECT status FROM reservations.reservation_funnel_sessions WHERE session_id = ?",
+                String.class,
+                abandonedSession)).isEqualTo("IN_PROGRESS");
+
+        jdbc.update(
+                "UPDATE reservations.reservation_funnel_sessions SET last_activity_at = ? WHERE session_id = ?",
+                Timestamp.from(Instant.now().minus(Duration.ofMinutes(31))),
+                abandonedSession);
+        progressCommands.abandonInactiveSessions();
+        recordProgress(abandonedSession, "CHECKOUT");
+        assertThat(jdbc.queryForObject(
+                "SELECT status FROM reservations.reservation_funnel_sessions WHERE session_id = ?",
+                String.class,
+                abandonedSession)).isEqualTo("ABANDONED");
+        assertThat(jdbc.queryForObject(
+                "SELECT screen FROM reservations.reservation_funnel_events WHERE session_id = ? AND event_type = 'ABANDONED'",
+                String.class,
+                abandonedSession)).isEqualTo("CHECKOUT");
+        assertThat(jdbc.queryForObject(
+                "SELECT count(*) FROM reservations.reservation_funnel_events WHERE session_id = ?",
+                Integer.class,
+                abandonedSession)).isEqualTo(3);
+
+        UUID completedSession = UUID.randomUUID();
+        recordProgress(completedSession, "DETAILS");
+        recordProgress(completedSession, "CONFIRMATION");
+        recordProgress(completedSession, "CHECKOUT");
+        assertThat(jdbc.queryForObject(
+                "SELECT status FROM reservations.reservation_funnel_sessions WHERE session_id = ?",
+                String.class,
+                completedSession)).isEqualTo("COMPLETED");
+        assertThat(jdbc.queryForObject(
+                "SELECT last_screen FROM reservations.reservation_funnel_sessions WHERE session_id = ?",
+                String.class,
+                completedSession)).isEqualTo("CONFIRMATION");
+        assertThat(jdbc.queryForObject(
+                "SELECT count(*) FROM reservations.reservation_funnel_events WHERE session_id = ? AND event_type = 'COMPLETED'",
+                Integer.class,
+                completedSession)).isEqualTo(1);
+    }
+
+    @Test
+    void validatesReservationProgressRequests() throws Exception {
+        mvc.perform(post("/api/reservation-progress").contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(post("/api/reservation-progress").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"sessionId\":\"not-a-uuid\",\"screen\":\"DETAILS\"}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    private void recordProgress(UUID sessionId, String screen) throws Exception {
+        mvc.perform(post("/api/reservation-progress").contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(new ProgressPayload(sessionId, screen))))
+                .andExpect(status().isNoContent());
+    }
+
+    private record ProgressPayload(UUID sessionId, String screen) {
     }
 
     private CatalogHotel hotel() {

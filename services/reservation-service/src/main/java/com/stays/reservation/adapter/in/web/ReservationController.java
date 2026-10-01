@@ -8,6 +8,7 @@ import com.stays.reservation.Reservation;
 import com.stays.reservation.ReservationRequest;
 
 import com.stays.reservation.application.command.ReservationCommands;
+import com.stays.reservation.application.command.ReservationProgressCommands;
 import com.stays.reservation.application.query.ReservationQueries;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -25,13 +26,22 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api")
 public class ReservationController {
     private final ReservationCommands reservationCommands;
+    private final ReservationProgressCommands progressCommands;
     private final ReservationQueries reservationQueries;
 
     public ReservationController(
             ReservationCommands reservationCommands,
+            ReservationProgressCommands progressCommands,
             ReservationQueries reservationQueries) {
         this.reservationCommands = reservationCommands;
+        this.progressCommands = progressCommands;
         this.reservationQueries = reservationQueries;
+    }
+
+    @PostMapping("/reservation-progress")
+    public ResponseEntity<Void> recordReservationProgress(@Valid @RequestBody ReservationProgressRequest request) {
+        progressCommands.recordScreen(request.sessionId(), request.screen());
+        return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/reservations")

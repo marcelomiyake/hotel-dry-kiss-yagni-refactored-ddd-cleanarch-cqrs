@@ -1,4 +1,4 @@
-import type { HotelCommands, CreateReservationCommand, ChangeInventoryCommand } from "../application/HotelCommands";
+import type { HotelCommands, CreateReservationCommand, ChangeInventoryCommand, ReservationProgressScreen } from "../application/HotelCommands";
 import type { HotelQueries, SearchStaysQuery } from "../application/HotelQueries";
 import { api } from "../api";
 import type { Hotel, Reservation, RoomTypeDraft, SearchResponse } from "../types";
@@ -26,6 +26,13 @@ export class HttpHotelGateway implements HotelQueries, HotelCommands {
     return api<Reservation>("/api/reservations", {
       method: "POST",
       body: JSON.stringify(command),
+    });
+  }
+
+  recordReservationProgress(sessionId: string, screen: ReservationProgressScreen): Promise<void> {
+    return api<void>("/api/reservation-progress", {
+      method: "POST",
+      body: JSON.stringify({ sessionId, screen }),
     });
   }
 
